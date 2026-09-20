@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/shapiro1987-sys/ai-assisted-qa-automation#readme",
   "devDependencies": {
-    "@playwright/test": "^1.63.0"
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2"
   }
 }
