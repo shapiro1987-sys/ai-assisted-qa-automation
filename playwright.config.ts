@@ -28,8 +28,8 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('')`. */
     // baseURL: 'http://localhost:3000',
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* Record traces for the HTML report. See https://playwright.dev/docs/trace-viewer */
+    trace: 'on',
   },
 
   /* Configure projects for major browsers */
