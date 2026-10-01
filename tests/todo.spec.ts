@@ -1,9 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
-const TODO_MVC_URL = 'https://demo.playwright.dev/todomvc/';
-
 async function openTodoApp(page: Page) {
-  await page.goto(TODO_MVC_URL);
+  await page.goto('/');
 }
 
 async function addTodo(page: Page, text: string) {
