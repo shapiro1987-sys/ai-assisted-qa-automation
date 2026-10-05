@@ -24,5 +24,13 @@
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.2",
     "dotenv": "^18.0.5"
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0",
+    "playwright-core": "^1.63.0",
+    "undici-types": "^8.9.0"
   }
 }

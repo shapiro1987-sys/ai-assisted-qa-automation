@@ -8,11 +8,14 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
+const didaxisAuthFile = path.join(__dirname, 'tests', '.didaxis-auth.json');
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig({
   testDir: './tests',
+  testIgnore: ['**/*_old.spec.ts', '**/old files/**'],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -35,8 +38,17 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
+      name: 'didaxis-setup',
+      testMatch: /didaxis-auth\.setup\.ts/,
+    },
+    {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      testIgnore: /didaxis-auth\.setup\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: didaxisAuthFile,
+      },
+      dependencies: ['didaxis-setup'],
     },
 
     {

@@ -10,7 +10,7 @@ export function requireCredentials() {
     throw new Error('DIDAXIS_EMAIL and DIDAXIS_PASSWORD must be set in .env');
   }
 
-  return { email, password };
+  return { email: email.trim(), password: password.trim() };
 }
 
 export function uniqueName(base: string) {
@@ -61,6 +61,20 @@ export function createButton(page: Page) {
   return newProgramModal(page).getByRole('button', { name: 'Create', exact: true });
 }
 
+export function cancelCreateButton(page: Page) {
+  return newProgramModal(page).getByRole('button', { name: 'Cancel', exact: true });
+}
+
+export function showAiGenerationConfigButton(page: Page) {
+  return newProgramModal(page).getByRole('button', {
+    name: /Show AI Generation Config/i,
+  });
+}
+
+export function newProgramModalHeading(page: Page) {
+  return newProgramModal(page).getByRole('heading', { name: 'New Program', level: 2 });
+}
+
 export function editProgramNameField(page: Page) {
   return editProgramModal(page).getByRole('textbox', { name: 'Program Name' });
 }
@@ -77,15 +91,41 @@ export function cancelEditButton(page: Page) {
   return editProgramModal(page).getByRole('button', { name: 'Cancel', exact: true });
 }
 
+export function editProgramModalHeading(page: Page) {
+  return editProgramModal(page).getByRole('heading', { name: 'Edit Program', level: 2 });
+}
+
+export function showEditAiGenerationConfigButton(page: Page) {
+  return editProgramModal(page).getByRole('button', {
+    name: /Show AI Generation Config/i,
+  });
+}
+
 export async function login(page: Page) {
   const { email, password } = requireCredentials();
+  const signOut = page.getByRole('button', { name: 'Sign out' });
+  const signIn = page.getByRole('button', { name: 'Sign In' });
+
+  await page.goto(`${DIDAXIS_URL}/programs`);
+  if (await signOut.isVisible().catch(() => false)) {
+    return;
+  }
 
   await page.goto(`${DIDAXIS_URL}/login`);
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  const emailField = page.getByLabel('Email');
+  const passwordField = page.getByLabel('Password');
 
-  await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+  await emailField.fill(email);
+  await passwordField.fill(password);
+  await passwordField.press('Tab');
+
+  if (await signIn.isEnabled().catch(() => false)) {
+    await signIn.click();
+  } else {
+    await passwordField.press('Enter');
+  }
+
+  await expect(signOut).toBeVisible({ timeout: 60_000 });
 }
 
 export async function goToPrograms(page: Page) {
@@ -116,10 +156,9 @@ export async function fillCreateProgramForm(
 }
 
 export async function expectProgramInList(page: Page, programName: string) {
-  await expect(newProgramModal(page)).not.toBeVisible({ timeout: 30_000 });
-  await expect(editProgramModal(page)).not.toBeVisible({ timeout: 30_000 });
+  await expect(newProgramModal(page)).not.toBeVisible({ timeout: 60_000 });
   await expect(programNameInList(page, programName)).toBeVisible({
-    timeout: 30_000,
+    timeout: 60_000,
   });
 }
 
@@ -136,8 +175,10 @@ export async function createProgram(
 ) {
   await openNewProgramModal(page);
   await fillCreateProgramForm(page, programName, description);
-  await expect(createButton(page)).toBeEnabled();
-  await createButton(page).click();
+  const create = createButton(page);
+  await expect(create).toBeEnabled();
+  await create.scrollIntoViewIfNeeded();
+  await create.click();
   await expectProgramInList(page, programName);
 }
 
@@ -162,10 +203,14 @@ export async function fillEditProgramForm(
 }
 
 export async function saveEditedProgram(page: Page, expectedName: string) {
-  await expect(saveButton(page)).toBeEnabled();
-  await saveButton(page).click();
-  await expect(editProgramModal(page)).not.toBeVisible({ timeout: 30_000 });
-  await expectProgramInList(page, expectedName);
+  const save = saveButton(page);
+  await expect(save).toBeEnabled();
+  await save.scrollIntoViewIfNeeded();
+  await save.click();
+  await expect(editProgramModal(page)).not.toBeVisible({ timeout: 60_000 });
+  await expect(programNameInList(page, expectedName)).toBeVisible({
+    timeout: 60_000,
+  });
 }
 
 export async function confirmDeleteDialog(

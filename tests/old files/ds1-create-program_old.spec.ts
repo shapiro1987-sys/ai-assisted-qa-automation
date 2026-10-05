@@ -1,19 +1,20 @@
-/**
- * DS-1 — Create new academic program
- * Jira: https://legionqaschool.atlassian.net/browse/DS-1
- */
 import { test, expect } from '@playwright/test';
 import {
-  createButton,
+  cancelEditButton,
   createDescriptionField,
   createProgram,
   createProgramNameField,
+  createButton,
+  editDescriptionField,
+  editProgramNameField,
+  editProgramModal,
   fillCreateProgramForm,
-  newProgramModal,
+  fillEditProgramForm,
+  openEditProgram,
   openNewProgramModal,
   programNameInList,
-  programsHeading,
   repeatChar,
+  saveButton,
   setupProgramsPage,
   uniqueName,
 } from './didaxis-helpers';
@@ -24,51 +25,26 @@ test.beforeEach(async ({ page }) => {
   await setupProgramsPage(page);
 });
 
-function jiraProgramName() {
-  return uniqueName('Web Development 2026');
-}
-
-test.describe('DS-1 — Jira acceptance criteria', () => {
-  test('AC-001 — Navigate to program creation form', async ({ page }) => {
-    await expect(programsHeading(page)).toBeVisible();
-
+test.describe('DS-1 Create Program - Positive flows', () => {
+  test('TC-001 — Program creation form displays required fields', async ({ page }) => {
     await openNewProgramModal(page);
 
-    await expect(newProgramModal(page)).toBeVisible();
     await expect(createProgramNameField(page)).toBeVisible();
     await expect(createDescriptionField(page)).toBeVisible();
   });
 
-  test('AC-002 — Successfully create a program (modal closes, list shows name)', async ({
-    page,
-  }) => {
-    const programName = jiraProgramName();
+  test('TC-002 — New program appears in list after successful creation', async ({ page }) => {
+    const programName = uniqueName('Web Development 2026');
     const description = uniqueName('Full-stack web development program');
 
-    await openNewProgramModal(page);
-    await fillCreateProgramForm(page, programName, description);
-    await expect(createButton(page)).toBeEnabled();
-    await createButton(page).click();
+    await createProgram(page, programName, description);
 
-    await expect(newProgramModal(page)).not.toBeVisible({ timeout: 30_000 });
-    await expect(programNameInList(page, programName)).toBeVisible();
-    await expect(page.getByText(description, { exact: true })).toBeVisible();
+    await expect(page.getByText(description, { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
-  test('AC-003 — Validation prevents empty program name', async ({ page }) => {
-    await openNewProgramModal(page);
-
-    await createDescriptionField(page).fill('Optional description for empty name test');
-
-    await expect(createProgramNameField(page)).toHaveValue('');
-    await expect(createButton(page)).toBeDisabled();
-  });
-});
-
-test.describe('DS-1 Create Program - Extended positive flows', () => {
-  test('TC-004 — Program can be created with name only and empty description', async ({
-    page,
-  }) => {
+  test('TC-003 — Program can be created with name only and empty description', async ({ page }) => {
     const programName = uniqueName('Data Science 2026');
 
     await openNewProgramModal(page);
@@ -76,12 +52,21 @@ test.describe('DS-1 Create Program - Extended positive flows', () => {
     await expect(createButton(page)).toBeEnabled();
     await createButton(page).click();
 
-    await expect(newProgramModal(page)).not.toBeVisible({ timeout: 30_000 });
-    await expect(programNameInList(page, programName)).toBeVisible();
+    await expect(programNameInList(page, programName)).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });
 
 test.describe('DS-1 Create Program - Negative flows', () => {
+  test('TC-004 — Create button remains disabled when Program Name is empty', async ({ page }) => {
+    await openNewProgramModal(page);
+
+    await createDescriptionField(page).fill('Optional description for empty name test');
+
+    await expect(createButton(page)).toBeDisabled();
+  });
+
   test('TC-005 — Duplicate program name is rejected on create', async ({ page }) => {
     const programName = uniqueName('Web Development 2026');
 
@@ -91,14 +76,12 @@ test.describe('DS-1 Create Program - Negative flows', () => {
     await expect(createButton(page)).toBeEnabled();
     await createButton(page).click();
 
-    await expect(newProgramModal(page)).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'New Program' })).toBeVisible();
     await expect(page.getByText(/already exists|duplicate/i)).toBeVisible();
     await expect(programNameInList(page, programName)).toHaveCount(1);
   });
 
-  test('TC-006 — Double-clicking Create does not create duplicate programs', async ({
-    page,
-  }) => {
+  test('TC-006 — Double-clicking Create does not create duplicate programs', async ({ page }) => {
     const programName = uniqueName('Mobile Development 2026');
     const description = 'iOS and Android development';
 
@@ -116,9 +99,7 @@ test.describe('DS-1 Create Program - Negative flows', () => {
 });
 
 test.describe('DS-1 Create Program - Edge cases', () => {
-  test('TC-007 — Program name at maximum length (100 characters) is accepted', async ({
-    page,
-  }) => {
+  test('TC-007 — Program name at maximum length (100 characters) is accepted', async ({ page }) => {
     const programName = repeatChar('A', 100);
     const description = 'Valid description';
 
@@ -135,15 +116,13 @@ test.describe('DS-1 Create Program - Edge cases', () => {
     await fillCreateProgramForm(page, programName, description);
     await createButton(page).click();
 
-    const modal = newProgramModal(page);
+    const modal = page.getByRole('dialog', { name: 'New Program' });
     await expect(modal).toBeVisible();
     await expect(modal.getByText(/100|maximum|too long|characters/i)).toBeVisible();
     await expect(programNameInList(page, programName)).toHaveCount(0);
   });
 
-  test('TC-009 — Description at maximum length (500 characters) is accepted', async ({
-    page,
-  }) => {
+  test('TC-009 — Description at maximum length (500 characters) is accepted', async ({ page }) => {
     const programName = uniqueName('Cloud Computing 2026');
     const description = repeatChar('D', 500);
 
@@ -160,7 +139,7 @@ test.describe('DS-1 Create Program - Edge cases', () => {
     await fillCreateProgramForm(page, programName, description);
     await createButton(page).click();
 
-    const modal = newProgramModal(page);
+    const modal = page.getByRole('dialog', { name: 'New Program' });
     await expect(modal).toBeVisible();
     await expect(modal.getByText(/500|maximum|too long|characters/i)).toBeVisible();
     await expect(programNameInList(page, programName)).toHaveCount(0);

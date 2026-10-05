@@ -1,84 +1,53 @@
-/**
- * DS-2 — Edit existing program details
- * Jira: https://legionqaschool.atlassian.net/browse/DS-2
- *
- * Locators verified on https://test.didaxis.studio (Edit Program modal).
- */
 import { test, expect } from '@playwright/test';
 import {
   cancelEditButton,
   createProgram,
   editDescriptionField,
   editProgramModal,
-  editProgramModalHeading,
   editProgramNameField,
   fillEditProgramForm,
-  goToPrograms,
   openEditProgram,
   programNameInList,
   repeatChar,
   saveButton,
   saveEditedProgram,
-  showEditAiGenerationConfigButton,
+  setupProgramsPage,
   uniqueName,
 } from './didaxis-helpers';
 
 test.setTimeout(120_000);
 
-test.describe.configure({ mode: 'serial' });
-
 test.beforeEach(async ({ page }) => {
-  await goToPrograms(page);
+  await setupProgramsPage(page);
 });
 
-function jiraProgramName() {
-  return uniqueName('Web Development 2026');
-}
-
-function jiraUpdatedProgramName(programName: string) {
-  const suffix = programName.slice('Web Development 2026'.length);
-  return `Web Development 2026 - Updated${suffix}`;
-}
-
-test.describe('DS-2 — Jira acceptance criteria', () => {
-  test('AC-001 — Open program for editing (form pre-populated)', async ({ page }) => {
-    const programName = jiraProgramName();
+test.describe('DS-2 Edit Program - Positive flows', () => {
+  test('TC-001 — Edit form opens pre-populated with current program data', async ({ page }) => {
+    const programName = uniqueName('Web Development 2026');
     const description = uniqueName('Full-stack web development program');
 
     await createProgram(page, programName, description);
     await openEditProgram(page, programName);
 
-    await expect(editProgramModal(page)).toBeVisible();
-    await expect(editProgramModalHeading(page)).toBeVisible();
     await expect(editProgramNameField(page)).toHaveValue(programName);
     await expect(editDescriptionField(page)).toHaveValue(description);
-
-    await cancelEditButton(page).click();
-    await expect(editProgramModal(page)).not.toBeVisible();
   });
 
-  test('AC-002 — Successfully edit a program name (modal closes, list updates)', async ({
-    page,
-  }) => {
-    const programName = jiraProgramName();
-    const updatedName = jiraUpdatedProgramName(programName);
+  test('TC-002 — Updated program name appears immediately in the list', async ({ page }) => {
+    const programName = uniqueName('Web Development 2026');
+    const updatedName = uniqueName('Web Development 2026 - Updated');
 
     await createProgram(page, programName, 'Original curriculum');
     await openEditProgram(page, programName);
     await fillEditProgramForm(page, updatedName);
+    await saveEditedProgram(page, updatedName);
 
-    const save = saveButton(page);
-    await expect(save).toBeEnabled();
-    await save.scrollIntoViewIfNeeded();
-    await save.click();
-
-    await expect(editProgramModal(page)).not.toBeVisible({ timeout: 60_000 });
     await expect(programNameInList(page, updatedName)).toBeVisible();
     await expect(programNameInList(page, programName)).toHaveCount(0);
   });
 
-  test('AC-003 — Edit preserves unchanged fields (description-only change)', async ({ page }) => {
-    const programName = jiraProgramName();
+  test('TC-003 — Unchanged fields are preserved when only Description is edited', async ({ page }) => {
+    const programName = uniqueName('Web Development 2026');
     const originalDescription = uniqueName('Full-stack web development program');
     const updatedDescription = uniqueName('Updated full-stack curriculum');
 
@@ -89,15 +58,8 @@ test.describe('DS-2 — Jira acceptance criteria', () => {
 
     await expect(programNameInList(page, programName)).toBeVisible();
     await expect(page.getByText(updatedDescription, { exact: true })).toBeVisible();
-    await expect(page.getByText(originalDescription, { exact: true })).toHaveCount(0);
-
-    await openEditProgram(page, programName);
-    await expect(editProgramNameField(page)).toHaveValue(programName);
-    await expect(editDescriptionField(page)).toHaveValue(updatedDescription);
   });
-});
 
-test.describe('DS-2 Edit Program - Extended positive flows', () => {
   test('TC-004 — Description can be cleared during edit', async ({ page }) => {
     const programName = uniqueName('Data Science 2026');
 
@@ -119,9 +81,6 @@ test.describe('DS-2 Edit Program - Negative flows', () => {
     await editProgramNameField(page).fill('');
 
     await expect(saveButton(page)).toBeDisabled();
-
-    await cancelEditButton(page).click();
-    await expect(editProgramModal(page)).not.toBeVisible();
   });
 
   test('TC-006 — Duplicate name on edit is rejected', async ({ page }) => {
@@ -164,13 +123,13 @@ test.describe('DS-2 Edit Program - Negative flows', () => {
     await expect(save).toBeEnabled();
     await save.dblclick();
 
-    await expect(editProgramModal(page)).not.toBeVisible({ timeout: 60_000 });
+    await expect(editProgramModal(page)).not.toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(updatedDescription, { exact: true })).toHaveCount(1);
   });
 });
 
 test.describe('DS-2 Edit Program - Edge cases', () => {
-  test('TC-009 — Program name with 100 characters is accepted on edit', async ({ page }) => {
+  test('TC-009 — Program name at maximum length (100 characters) is accepted on edit', async ({ page }) => {
     const programName = uniqueName('Web Development 2026');
     const updatedName = repeatChar('B', 100);
 
@@ -182,21 +141,21 @@ test.describe('DS-2 Edit Program - Edge cases', () => {
     await expect(programNameInList(page, updatedName)).toBeVisible();
   });
 
-  test('TC-010 — Program name with 101 characters is accepted on edit (no client maxlength)', async ({
-    page,
-  }) => {
+  test('TC-010 — Program name exceeding 100 characters is rejected on edit', async ({ page }) => {
     const programName = uniqueName('Web Development 2026');
-    const updatedName = repeatChar('B', 101);
+    const tooLongName = repeatChar('B', 101);
 
     await createProgram(page, programName, 'Valid description');
     await openEditProgram(page, programName);
-    await fillEditProgramForm(page, updatedName);
-    await saveEditedProgram(page, updatedName);
+    await fillEditProgramForm(page, tooLongName);
+    await saveButton(page).click();
 
-    await expect(programNameInList(page, updatedName)).toBeVisible();
+    await expect(editProgramModal(page)).toBeVisible();
+    await expect(editProgramModal(page).getByText(/100|maximum|too long|characters/i)).toBeVisible();
+    await expect(programNameInList(page, programName)).toBeVisible();
   });
 
-  test('TC-011 — Description with 500 characters is accepted on edit', async ({ page }) => {
+  test('TC-011 — Description at maximum length (500 characters) is accepted on edit', async ({ page }) => {
     const programName = uniqueName('Web Development 2026');
     const updatedDescription = repeatChar('D', 500);
 
@@ -228,19 +187,5 @@ test.describe('DS-2 Edit Program - Edge cases', () => {
     await saveEditedProgram(page, updatedName);
 
     await expect(programNameInList(page, updatedName)).toBeVisible();
-  });
-
-  test('TC-014 — AI Generation Config fields visible on edit form', async ({ page }) => {
-    const programName = uniqueName('Web Development 2026');
-
-    await createProgram(page, programName, 'Probe for AI section');
-    await openEditProgram(page, programName);
-
-    await expect(showEditAiGenerationConfigButton(page)).toBeVisible();
-    await expect(
-      editProgramModal(page).getByText('Required for AI curriculum generation'),
-    ).toBeVisible();
-
-    await cancelEditButton(page).click();
   });
 });

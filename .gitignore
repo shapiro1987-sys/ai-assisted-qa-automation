@@ -11,3 +11,4 @@ playwright/.cache/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+tests/.didaxis-auth.json
