@@ -1,5 +1,9 @@
 # Test Plan: Delete program with confirmation (DS-4)
 
+**Jira:** [DS-4](https://legionqaschool.atlassian.net/browse/DS-4)  
+**Gherkin:** `features/DS-4.feature`  
+**Automation:** `tests/ds4-delete-program.spec.ts`
+
 ## Positive flows
 
 ### TC-001 — Confirmed deletion removes program from the list

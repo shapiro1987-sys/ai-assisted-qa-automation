@@ -2,6 +2,7 @@
 
 **Jira:** [DS-2](https://legionqaschool.atlassian.net/browse/DS-2) — **Edit existing program details** (Story, In Progress, High)  
 **User story:** As an admin user, I want to edit an existing program's details so that I can correct or update program information after creation.  
+**Gherkin:** `features/DS-2.feature`  
 **Automation:** `tests/ds2-edit-program.spec.ts` (prior sync: `.old/ds2-edit-program_old.spec.ts`)  
 **Explored on:** `https://test.didaxis.studio` — Programs list, Edit Program modal (browser MCP, Oct 2025)
 

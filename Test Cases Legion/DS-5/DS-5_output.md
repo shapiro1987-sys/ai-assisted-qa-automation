@@ -1,5 +1,9 @@
 # Test Plan: Program list filtering and display (DS-5)
 
+**Jira:** [DS-5](https://legionqaschool.atlassian.net/browse/DS-5)  
+**Gherkin:** `features/DS-5.feature`  
+**Automation:** `tests/ds5-program-list.spec.ts`
+
 ## Positive flows
 
 ### TC-001 — Program list displays name and description for each program

@@ -1,5 +1,9 @@
 # Test Plan: Program name validation and duplicate prevention (DS-3)
 
+**Jira:** [DS-3](https://legionqaschool.atlassian.net/browse/DS-3)  
+**Gherkin:** `features/DS-3.feature`  
+**Automation:** `tests/ds3-name-validation.spec.ts`
+
 ## Positive flows
 
 ### TC-001 — Program name with special characters is accepted

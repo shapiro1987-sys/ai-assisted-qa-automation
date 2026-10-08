@@ -3,6 +3,7 @@
 **Jira:** [DS-1](https://legionqaschool.atlassian.net/browse/DS-1) — Story, In Progress, High  
 **User story:** As an admin user, I want to create a new academic program so that I can begin designing its curriculum structure.  
 **Reference:** Confluence — Program Setup & Management > Overview  
+**Gherkin:** `features/DS-1.feature`  
 **Automation:** `tests/ds1-create-program.spec.ts` (previous version: `.old/ds1-create-program_old.spec.ts`)
 
 ## Jira acceptance criteria (required coverage)
