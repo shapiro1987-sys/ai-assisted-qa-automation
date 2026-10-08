@@ -17,7 +17,7 @@ import {
   saveButton,
   setupProgramsPage,
   uniqueName,
-} from './didaxis-helpers';
+} from '../tests/didaxis-helpers';
 
 test.setTimeout(120_000);
 

@@ -1,7 +1,3 @@
-/**
- * DS-2 — Edit existing program details
- * Jira: https://legionqaschool.atlassian.net/browse/DS-2
- */
 import { test, expect } from '@playwright/test';
 import {
   cancelEditButton,
@@ -17,7 +13,7 @@ import {
   saveEditedProgram,
   setupProgramsPage,
   uniqueName,
-} from './didaxis-helpers';
+} from '../tests/didaxis-helpers';
 
 test.setTimeout(120_000);
 
@@ -25,49 +21,33 @@ test.beforeEach(async ({ page }) => {
   await setupProgramsPage(page);
 });
 
-/** Names mirror Jira examples with a timestamp suffix for parallel-safe runs. */
-function jiraProgramName() {
-  return uniqueName('Web Development 2026');
-}
-
-function jiraUpdatedProgramName(programName: string) {
-  const suffix = programName.slice('Web Development 2026'.length);
-  return `Web Development 2026 - Updated${suffix}`;
-}
-
-test.describe('DS-2 — Jira acceptance criteria', () => {
-  test('AC-001 — Open program for editing (form pre-populated)', async ({ page }) => {
-    const programName = jiraProgramName();
+test.describe('DS-2 Edit Program - Positive flows', () => {
+  test('TC-001 — Edit form opens pre-populated with current program data', async ({ page }) => {
+    const programName = uniqueName('Web Development 2026');
     const description = uniqueName('Full-stack web development program');
 
     await createProgram(page, programName, description);
     await openEditProgram(page, programName);
 
-    await expect(editProgramModal(page)).toBeVisible();
     await expect(editProgramNameField(page)).toHaveValue(programName);
     await expect(editDescriptionField(page)).toHaveValue(description);
   });
 
-  test('AC-002 — Successfully edit a program name (modal closes, list updates)', async ({
-    page,
-  }) => {
-    const programName = jiraProgramName();
-    const updatedName = jiraUpdatedProgramName(programName);
+  test('TC-002 — Updated program name appears immediately in the list', async ({ page }) => {
+    const programName = uniqueName('Web Development 2026');
+    const updatedName = uniqueName('Web Development 2026 - Updated');
 
     await createProgram(page, programName, 'Original curriculum');
     await openEditProgram(page, programName);
     await fillEditProgramForm(page, updatedName);
+    await saveEditedProgram(page, updatedName);
 
-    await expect(saveButton(page)).toBeEnabled();
-    await saveButton(page).click();
-
-    await expect(editProgramModal(page)).not.toBeVisible({ timeout: 30_000 });
     await expect(programNameInList(page, updatedName)).toBeVisible();
     await expect(programNameInList(page, programName)).toHaveCount(0);
   });
 
-  test('AC-003 — Edit preserves unchanged fields (description-only change)', async ({ page }) => {
-    const programName = jiraProgramName();
+  test('TC-003 — Unchanged fields are preserved when only Description is edited', async ({ page }) => {
+    const programName = uniqueName('Web Development 2026');
     const originalDescription = uniqueName('Full-stack web development program');
     const updatedDescription = uniqueName('Updated full-stack curriculum');
 
@@ -78,15 +58,8 @@ test.describe('DS-2 — Jira acceptance criteria', () => {
 
     await expect(programNameInList(page, programName)).toBeVisible();
     await expect(page.getByText(updatedDescription, { exact: true })).toBeVisible();
-    await expect(page.getByText(originalDescription, { exact: true })).toHaveCount(0);
-
-    await openEditProgram(page, programName);
-    await expect(editProgramNameField(page)).toHaveValue(programName);
-    await expect(editDescriptionField(page)).toHaveValue(updatedDescription);
   });
-});
 
-test.describe('DS-2 Edit Program - Extended positive flows', () => {
   test('TC-004 — Description can be cleared during edit', async ({ page }) => {
     const programName = uniqueName('Data Science 2026');
 
@@ -156,9 +129,7 @@ test.describe('DS-2 Edit Program - Negative flows', () => {
 });
 
 test.describe('DS-2 Edit Program - Edge cases', () => {
-  test('TC-009 — Program name at maximum length (100 characters) is accepted on edit', async ({
-    page,
-  }) => {
+  test('TC-009 — Program name at maximum length (100 characters) is accepted on edit', async ({ page }) => {
     const programName = uniqueName('Web Development 2026');
     const updatedName = repeatChar('B', 100);
 
@@ -184,9 +155,7 @@ test.describe('DS-2 Edit Program - Edge cases', () => {
     await expect(programNameInList(page, programName)).toBeVisible();
   });
 
-  test('TC-011 — Description at maximum length (500 characters) is accepted on edit', async ({
-    page,
-  }) => {
+  test('TC-011 — Description at maximum length (500 characters) is accepted on edit', async ({ page }) => {
     const programName = uniqueName('Web Development 2026');
     const updatedDescription = repeatChar('D', 500);
 

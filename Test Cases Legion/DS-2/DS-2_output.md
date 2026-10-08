@@ -2,7 +2,7 @@
 
 **Jira:** [DS-2](https://legionqaschool.atlassian.net/browse/DS-2) — **Edit existing program details** (Story, In Progress, High)  
 **User story:** As an admin user, I want to edit an existing program's details so that I can correct or update program information after creation.  
-**Automation:** `tests/ds2-edit-program.spec.ts` (prior sync: `ds2-edit-program_old.spec.ts`)  
+**Automation:** `tests/ds2-edit-program.spec.ts` (prior sync: `.old/ds2-edit-program_old.spec.ts`)  
 **Explored on:** `https://test.didaxis.studio` — Programs list, Edit Program modal (browser MCP, Oct 2025)
 
 ## Live app notes (vs Jira AC)
@@ -81,4 +81,4 @@ Scenario: Edit preserves unchanged fields
 | TC-013 | `TC-013 — Special characters in edited name are preserved` | |
 | TC-014 | `TC-014 — AI Generation Config fields visible on edit form` | **New** from edit modal |
 
-Narrative detail for legacy cases: `DS-2_output_old.md`.
+Narrative detail for legacy cases: `.old/DS-2_output_old.md`.

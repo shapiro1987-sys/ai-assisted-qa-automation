@@ -3,7 +3,7 @@
 **Jira:** [DS-1](https://legionqaschool.atlassian.net/browse/DS-1) — Story, In Progress, High  
 **User story:** As an admin user, I want to create a new academic program so that I can begin designing its curriculum structure.  
 **Reference:** Confluence — Program Setup & Management > Overview  
-**Automation:** `tests/ds1-create-program.spec.ts` (previous version: `ds1-create-program_old.spec.ts`)
+**Automation:** `tests/ds1-create-program.spec.ts` (previous version: `.old/ds1-create-program_old.spec.ts`)
 
 ## Jira acceptance criteria (required coverage)
 
@@ -85,4 +85,4 @@ Scenario: Validation prevents empty program name
 | TC-011 | Special characters in program name accepted |
 | TC-012 | Whitespace-only name treated as empty |
 
-Full narrative steps: see `DS-1_output_old.md`.
+Full narrative steps: see `.old/DS-1_output_old.md`.
