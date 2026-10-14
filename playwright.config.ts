@@ -32,7 +32,7 @@ export default defineConfig({
     baseURL: process.env.BASE_URL ?? 'https://demo.playwright.dev/todomvc/',
 
     /* Record traces for the HTML report. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on',
+    trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
   },
 
   /* Configure projects for major browsers */

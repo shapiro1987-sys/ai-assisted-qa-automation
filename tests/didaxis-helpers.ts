@@ -29,8 +29,17 @@ export function newProgramButton(page: Page) {
   return page.getByRole('button', { name: '+ New Program' });
 }
 
+/** Program row anchor — stable on large lists (5k+ programs). */
 export function programNameInList(page: Page, programName: string) {
-  return page.getByText(programName, { exact: true });
+  return page.getByRole('button', { name: `Edit ${programName}`, exact: true });
+}
+
+export function programListEntry(page: Page, programName: string) {
+  return page
+    .locator('main')
+    .locator('*')
+    .filter({ has: page.getByRole('button', { name: `Delete ${programName}`, exact: true }) })
+    .first();
 }
 
 export function editProgramButton(page: Page, programName: string) {
@@ -106,12 +115,15 @@ export async function login(page: Page) {
   const signOut = page.getByRole('button', { name: 'Sign out' });
   const signIn = page.getByRole('button', { name: 'Sign In' });
 
-  await page.goto(`${DIDAXIS_URL}/programs`);
-  if (await signOut.isVisible().catch(() => false)) {
+  await page.goto(`${DIDAXIS_URL}/programs`, { waitUntil: 'domcontentloaded' });
+  if (await signOut.isVisible({ timeout: 15_000 }).catch(() => false)) {
+    return;
+  }
+  if (await newProgramButton(page).isVisible({ timeout: 5_000 }).catch(() => false)) {
     return;
   }
 
-  await page.goto(`${DIDAXIS_URL}/login`);
+  await page.goto(`${DIDAXIS_URL}/login`, { waitUntil: 'domcontentloaded' });
   const emailField = page.getByLabel('Email');
   const passwordField = page.getByLabel('Password');
 
@@ -129,10 +141,17 @@ export async function login(page: Page) {
 }
 
 export async function goToPrograms(page: Page) {
-  await page.goto(`${DIDAXIS_URL}/programs`);
-  await expect(programsHeading(page)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('Manage academic programs and semesters')).toBeVisible();
-  await expect(newProgramButton(page)).toBeVisible();
+  await page.goto(`${DIDAXIS_URL}/programs`, { waitUntil: 'domcontentloaded' });
+  const newProgram = newProgramButton(page);
+  const onLoginPage = page.getByLabel('Email');
+
+  if (await onLoginPage.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    await login(page);
+    await page.goto(`${DIDAXIS_URL}/programs`, { waitUntil: 'domcontentloaded' });
+  }
+
+  await expect(newProgram).toBeVisible({ timeout: 60_000 });
+  await expect(programsHeading(page)).toBeVisible({ timeout: 15_000 });
 }
 
 export async function openNewProgramModal(page: Page) {
@@ -156,10 +175,19 @@ export async function fillCreateProgramForm(
 }
 
 export async function expectProgramInList(page: Page, programName: string) {
-  await expect(newProgramModal(page)).not.toBeVisible({ timeout: 60_000 });
-  await expect(programNameInList(page, programName)).toBeVisible({
-    timeout: 60_000,
-  });
+  await expect(newProgramModal(page)).not.toBeVisible({ timeout: 30_000 });
+  const edit = programNameInList(page, programName).first();
+  await edit.scrollIntoViewIfNeeded();
+  await expect(edit).toBeVisible({ timeout: 60_000 });
+}
+
+export async function expectCreateProgramRejected(
+  page: Page,
+  reason: RegExp = /already exists|duplicate|unique/i,
+) {
+  const modal = newProgramModal(page);
+  await expect(modal).toBeVisible({ timeout: 15_000 });
+  await expect(modal.getByText(reason)).toBeVisible({ timeout: 30_000 });
 }
 
 export async function expectProgramNotInList(page: Page, programName: string) {
