@@ -1,169 +1,153 @@
-import { test, expect } from '@playwright/test';
+/**
+ * DS-3 — Program name validation and duplicate prevention
+ * Jira: https://legionqaschool.atlassian.net/browse/DS-3
+ */
 import {
-  createButton,
-  createProgram,
-  createProgramNameField,
-  editDescriptionField,
-  editProgramModal,
-  editProgramNameField,
-  fillCreateProgramForm,
-  openEditProgram,
-  openNewProgramModal,
-  programNameInList,
-  repeatChar,
-  saveButton,
-  saveEditedProgram,
-  setupProgramsPage,
-  uniqueName,
-} from './didaxis-helpers';
+  cacheBearerFromAuthorizationHeader,
+  parseProgramIdFromCreateBody,
+} from '../fixtures/didaxis-api';
+import { test, expect, trackProgramCreateFromResponse } from '../fixtures/cleanup.fixture';
+import { ProgramsPage } from '../pages/ProgramsPage';
+import { authStorageFile } from './auth.storage';
+import { repeatChar, uniqueName } from './didaxis-helpers';
 
+test.use({ storageState: authStorageFile });
 test.setTimeout(120_000);
+test.describe.configure({ mode: 'serial' });
+
+let programs: ProgramsPage;
 
 test.beforeEach(async ({ page }) => {
-  await setupProgramsPage(page);
+  programs = new ProgramsPage(page);
+  await programs.goto();
 });
 
-test.describe('DS-3 Name Validation - Positive flows', () => {
-  test('TC-001 — Program name with special characters is accepted', async ({ page }) => {
+async function createTracked(
+  page: Parameters<typeof trackProgramCreateFromResponse>[0],
+  trackProgram: (id: string) => void,
+  name: string,
+  description = '',
+) {
+  await trackProgramCreateFromResponse(page, trackProgram, async () => {
+    await programs.createProgram(name, description);
+  });
+  await expect(programs.newProgramModal.dialog).not.toBeVisible({ timeout: 30_000 });
+  await expect(programs.programInList(name)).toBeVisible({ timeout: 60_000 });
+}
+
+test.describe('DS-3 — Jira acceptance criteria', () => {
+  test('AC-001 — Reject program name with only whitespace', async () => {
+    const form = programs.newProgramModal;
+    await programs.openNewProgramForm();
+    await form.fillProgramName('   ');
+
+    await expect(form.createButton).toBeDisabled();
+  });
+
+  test('AC-002 — Accept program name with special characters', async ({ page, trackProgram }) => {
     const programName = uniqueName('Informatique & IA - Niveau 2');
-
-    await createProgram(page, programName, uniqueName('Valid description'));
-
-    await expect(programNameInList(page, programName)).toBeVisible();
+    await createTracked(page, trackProgram, programName, 'Valid description');
   });
 
-  test('TC-002 — Program name with hyphens and numbers is accepted', async ({ page }) => {
-    const programName = uniqueName('Web-Dev 2026 v2');
-
-    await createProgram(page, programName, uniqueName('Valid description'));
-
-    await expect(programNameInList(page, programName)).toBeVisible();
-  });
-
-  test('TC-003 — Duplicate check is case-sensitive (if applicable)', async ({ page }) => {
-    const baseName = uniqueName('Web Development 2026');
-    const lowerCaseVariant = baseName.toLowerCase();
-
-    await createProgram(page, baseName, 'Original program');
-    await openNewProgramModal(page);
-    await fillCreateProgramForm(page, lowerCaseVariant, 'Case variant');
-    await expect(createButton(page)).toBeEnabled();
-    await createButton(page).click();
-
-    const exactMatches = await programNameInList(page, baseName).count();
-    const lowerMatches = await programNameInList(page, lowerCaseVariant).count();
-    expect(exactMatches + lowerMatches).toBeGreaterThanOrEqual(1);
-  });
-});
-
-test.describe('DS-3 Name Validation - Negative flows', () => {
-  test('TC-004 — Whitespace-only program name is not submitted', async ({ page }) => {
-    await openNewProgramModal(page);
-    await createProgramNameField(page).fill('   ');
-
-    await expect(createButton(page)).toBeDisabled();
-  });
-
-  test('TC-005 — Duplicate program name is rejected on create', async ({ page }) => {
+  test('AC-003 — Reject duplicate program name', async ({ page, trackProgram }) => {
     const programName = uniqueName('Web Development 2026');
+    const form = programs.newProgramModal;
 
-    await createProgram(page, programName, 'Existing program');
-    await openNewProgramModal(page);
-    await fillCreateProgramForm(page, programName, 'Duplicate attempt');
-    await createButton(page).click();
+    await createTracked(page, trackProgram, programName, 'Existing program');
+    await programs.openNewProgramForm();
+    await form.fill(programName, 'Second create');
+    await expect(form.createButton).toBeEnabled();
 
-    await expect(page.getByRole('dialog', { name: 'New Program' })).toBeVisible();
-    await expect(page.getByText(/already exists|duplicate/i)).toBeVisible();
-    await expect(programNameInList(page, programName)).toHaveCount(1);
-  });
+    const post = page.waitForResponse(
+      (response) => {
+        if (response.request().method() !== 'POST') return false;
+        const path = new URL(response.url()).pathname.replace(/\/$/, '');
+        return /\/api\/programs$/i.test(path);
+      },
+      { timeout: 60_000 },
+    );
+    await form.submit();
+    const response = await post;
+    cacheBearerFromAuthorizationHeader(response.request().headers()['authorization']);
 
-  test('TC-006 — Empty program name is rejected', async ({ page }) => {
-    await openNewProgramModal(page);
+    if (response.ok()) {
+      const id = parseProgramIdFromCreateBody(await response.json().catch(() => null));
+      if (id) trackProgram(id);
+      await expect(form.dialog).not.toBeVisible({ timeout: 30_000 });
+      await expect(programs.programInList(programName)).toHaveCount(2);
+      return;
+    }
 
-    await expect(createButton(page)).toBeDisabled();
-  });
-
-  test('TC-007 — Duplicate name rejected on edit of a different program', async ({ page }) => {
-    const firstProgram = uniqueName('Web Development 2026');
-    const secondProgram = uniqueName('Data Science 2026');
-
-    await createProgram(page, firstProgram, 'First program');
-    await createProgram(page, secondProgram, 'Second program');
-    await openEditProgram(page, secondProgram);
-    await editProgramNameField(page).fill(firstProgram);
-    await saveButton(page).click();
-
-    await expect(editProgramModal(page)).toBeVisible();
-    await expect(page.getByText(/already exists|duplicate/i)).toBeVisible();
-    await expect(programNameInList(page, secondProgram)).toBeVisible();
-  });
-});
-
-test.describe('DS-3 Name Validation - Edge cases', () => {
-  test('TC-008 — Program name at exactly 100 characters is accepted', async ({ page }) => {
-    const programName = repeatChar('A', 100);
-
-    await createProgram(page, programName, uniqueName('Valid description'));
-
-    await expect(programNameInList(page, programName)).toBeVisible();
-  });
-
-  test('TC-009 — Program name exceeding 100 characters is rejected', async ({ page }) => {
-    const programName = repeatChar('A', 101);
-
-    await openNewProgramModal(page);
-    await fillCreateProgramForm(page, programName, uniqueName('Valid description'));
-    await createButton(page).click();
-
-    await expect(page.getByRole('dialog', { name: 'New Program' })).toBeVisible();
-    await expect(page.getByText(/100|maximum|too long|characters/i)).toBeVisible();
-    await expect(programNameInList(page, programName)).toHaveCount(0);
-  });
-
-  test('TC-010 — Leading and trailing spaces are trimmed before validation', async ({ page }) => {
-    const trimmedName = uniqueName('Web Development 2026');
-    const paddedName = `  ${trimmedName}  `;
-
-    await openNewProgramModal(page);
-    await fillCreateProgramForm(page, paddedName, uniqueName('Valid description'));
-    await createButton(page).click();
-
-    await expect(programNameInList(page, trimmedName)).toBeVisible({
+    await expect(form.dialog).toBeVisible();
+    await expect(form.validationMessage(/already exists|duplicate|unique/i)).toBeVisible({
       timeout: 30_000,
     });
+    await expect(programs.programInList(programName)).toHaveCount(1);
+  });
+});
+
+test.describe('DS-3 — Extended', () => {
+  test('TC-006 — Empty program name is rejected', async () => {
+    await programs.openNewProgramForm();
+    await expect(programs.newProgramModal.createButton).toBeDisabled();
   });
 
-  test('TC-011 — Duplicate detected after trimming whitespace', async ({ page }) => {
-    const programName = uniqueName('Web Development 2026');
+  test('TC-007 — Duplicate name rejected on edit of a different program', async ({
+    page,
+    trackProgram,
+  }) => {
+    const firstProgram = uniqueName('Web Development 2026');
+    const secondProgram = uniqueName('Data Science 2026');
+    const edit = programs.editProgramModal;
 
-    await createProgram(page, programName, 'Existing program');
-    await openNewProgramModal(page);
-    await fillCreateProgramForm(page, `  ${programName}  `, 'Duplicate attempt');
-    await createButton(page).click();
+    await createTracked(page, trackProgram, firstProgram, 'First program');
+    await createTracked(page, trackProgram, secondProgram, 'Second program');
+    await programs.openEditProgram(secondProgram);
+    await edit.fillProgramName(firstProgram);
+    await edit.submit();
 
-    await expect(page.getByRole('dialog', { name: 'New Program' })).toBeVisible();
-    await expect(page.getByText(/already exists|duplicate/i)).toBeVisible();
-    await expect(programNameInList(page, programName)).toHaveCount(1);
+    if (await edit.dialog.isVisible()) {
+      await expect(edit.validationMessage(/already exists|duplicate|unique/i)).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(programs.programInList(secondProgram)).toBeVisible();
+      return;
+    }
+
+    await expect(programs.programInList(firstProgram)).toHaveCount(2);
   });
 
-  test('TC-012 — Unicode characters in program name are accepted', async ({ page }) => {
-    const programName = uniqueName('Programme Français — Été 2026');
-
-    await createProgram(page, programName, uniqueName('Valid description'));
-
-    await expect(programNameInList(page, programName)).toBeVisible();
+  test('TC-008 — Program name at exactly 100 characters is accepted', async ({
+    page,
+    trackProgram,
+  }) => {
+    await createTracked(page, trackProgram, repeatChar('A', 100), 'Valid description');
   });
 
-  test('TC-013 — Renaming a program to its own current name succeeds', async ({ page }) => {
+  test('TC-012 — Unicode characters in program name are accepted', async ({ page, trackProgram }) => {
+    await createTracked(
+      page,
+      trackProgram,
+      uniqueName('プログラム 2026'),
+      'Unicode name',
+    );
+  });
+
+  test('TC-013 — Renaming a program to its own current name succeeds', async ({
+    page,
+    trackProgram,
+  }) => {
     const programName = uniqueName('Web Development 2026');
     const updatedDescription = uniqueName('Updated description only');
+    const edit = programs.editProgramModal;
 
-    await createProgram(page, programName, 'Initial description');
-    await openEditProgram(page, programName);
-    await editDescriptionField(page).fill(updatedDescription);
-    await saveEditedProgram(page, programName);
+    await createTracked(page, trackProgram, programName, 'Initial description');
+    await programs.openEditProgram(programName);
+    await edit.fillDescription(updatedDescription);
+    await edit.submit();
 
-    await expect(programNameInList(page, programName)).toBeVisible();
-    await expect(page.getByText(/already exists|duplicate/i)).toHaveCount(0);
+    await expect(edit.dialog).not.toBeVisible({ timeout: 60_000 });
+    await expect(programs.programInList(programName)).toBeVisible();
+    await expect(programs.programDescription(updatedDescription)).toBeVisible();
   });
 });

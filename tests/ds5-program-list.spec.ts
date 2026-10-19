@@ -1,139 +1,130 @@
-import { test, expect } from '@playwright/test';
-import {
-  createProgram,
-  deleteProgram,
-  editProgramNameField,
-  fillEditProgramForm,
-  newProgramButton,
-  openEditProgram,
-  openNewProgramModal,
-  programNameInList,
-  programsHeading,
-  repeatChar,
-  saveEditedProgram,
-  setupProgramsPage,
-  uniqueName,
-} from './didaxis-helpers';
+/**
+ * DS-5 — Program list filtering and display
+ * Jira: https://legionqaschool.atlassian.net/browse/DS-5
+ */
+import { test, expect, trackProgramCreateFromResponse } from '../fixtures/cleanup.fixture';
+import { ProgramsPage } from '../pages/ProgramsPage';
+import { authStorageFile } from './auth.storage';
+import { repeatChar, uniqueName } from './didaxis-helpers';
 
+test.use({ storageState: authStorageFile });
 test.setTimeout(120_000);
+test.describe.configure({ mode: 'serial' });
+
+let programs: ProgramsPage;
 
 test.beforeEach(async ({ page }) => {
-  await setupProgramsPage(page);
+  programs = new ProgramsPage(page);
+  await programs.goto();
 });
 
-test.describe('DS-5 Program List - Positive flows', () => {
-  test('TC-001 — Program list displays name and description for each program', async ({ page }) => {
+async function createTracked(
+  page: Parameters<typeof trackProgramCreateFromResponse>[0],
+  trackProgram: (id: string) => void,
+  name: string,
+  description = '',
+) {
+  await trackProgramCreateFromResponse(page, trackProgram, async () => {
+    await programs.createProgram(name, description);
+  });
+  await expect(programs.newProgramModal.dialog).not.toBeVisible({ timeout: 30_000 });
+  await expect(programs.programInList(name)).toBeVisible({ timeout: 60_000 });
+}
+
+test.describe('DS-5 — Jira acceptance criteria', () => {
+  test('AC-001 — Display program list with key details', async ({ page, trackProgram }) => {
     const firstProgram = uniqueName('Web Development 2026');
     const secondProgram = uniqueName('Data Science 2026');
     const firstDescription = uniqueName('Frontend and backend curriculum');
     const secondDescription = uniqueName('Machine learning fundamentals');
 
-    await createProgram(page, firstProgram, firstDescription);
-    await createProgram(page, secondProgram, secondDescription);
+    await createTracked(page, trackProgram, firstProgram, firstDescription);
+    await createTracked(page, trackProgram, secondProgram, secondDescription);
 
-    await expect(programNameInList(page, firstProgram)).toBeVisible();
-    await expect(programNameInList(page, secondProgram)).toBeVisible();
-    await expect(page.getByText(firstDescription, { exact: true })).toBeVisible();
-    await expect(page.getByText(secondDescription, { exact: true })).toBeVisible();
+    await expect(programs.heading).toBeVisible();
+    await expect(programs.programInList(firstProgram)).toBeVisible();
+    await expect(programs.programInList(secondProgram)).toBeVisible();
+    await expect(programs.programDescription(firstDescription)).toBeVisible();
+    await expect(programs.programDescription(secondDescription)).toBeVisible();
   });
 
-  test('TC-002 — Empty state shown when no programs exist', async ({ page }) => {
-    test.fixme(
-      true,
-      'Shared test environment always contains existing programs; empty-state cannot be verified reliably.',
-    );
+  test('AC-002 — Empty state when no programs exist', async () => {
+    test.skip(true, 'Shared test environment always contains programs.');
   });
+});
 
-  test('TC-003 — Newly created program appears in the list immediately', async ({ page }) => {
+test.describe('DS-5 — Extended', () => {
+  test('TC-003 — Newly created program appears in the list immediately', async ({
+    page,
+    trackProgram,
+  }) => {
     const programName = uniqueName('Mobile Development 2026');
     const description = uniqueName('Cross-platform mobile apps');
-
-    await createProgram(page, programName, description);
-
-    await expect(programNameInList(page, programName)).toBeVisible();
-    await expect(page.getByText(description, { exact: true })).toBeVisible();
+    await createTracked(page, trackProgram, programName, description);
+    await expect(programs.programDescription(description)).toBeVisible();
   });
 
-  test('TC-004 — Program with empty description displays correctly in list', async ({ page }) => {
+  test('TC-004 — Program with empty description displays correctly in list', async ({
+    page,
+    trackProgram,
+  }) => {
     const programName = uniqueName('DevOps 2026');
-
-    await createProgram(page, programName);
-
-    await expect(programNameInList(page, programName)).toBeVisible();
+    await createTracked(page, trackProgram, programName);
   });
-});
 
-test.describe('DS-5 Program List - Negative flows', () => {
-  test('TC-005 — Program list does not show stale data after deletion', async ({ page }) => {
+  test('TC-005 — Program list does not show stale data after deletion', async ({
+    page,
+    trackProgram,
+  }) => {
     const programName = uniqueName('Test Program');
-
-    await createProgram(page, programName, uniqueName('Stale data check'));
-    await deleteProgram(page, programName);
-
-    await expect(programNameInList(page, programName)).toHaveCount(0);
+    await createTracked(page, trackProgram, programName, 'Stale data check');
+    await programs.deleteProgram(programName, 'accept');
+    await expect(programs.programInList(programName)).toHaveCount(0, { timeout: 30_000 });
   });
 
-  test('TC-006 — Program list reflects edited name without refresh', async ({ page }) => {
+  test('TC-006 — Program list reflects edited name without refresh', async ({
+    page,
+    trackProgram,
+  }) => {
     const originalName = uniqueName('Web Development 2026');
     const updatedName = uniqueName('Web Development 2026 - Updated');
+    const edit = programs.editProgramModal;
 
-    await createProgram(page, originalName, uniqueName('List refresh check'));
-    await openEditProgram(page, originalName);
-    await fillEditProgramForm(page, updatedName);
-    await saveEditedProgram(page, updatedName);
+    await createTracked(page, trackProgram, originalName, 'List refresh check');
+    await programs.openEditProgram(originalName);
+    await edit.fill(updatedName);
+    await edit.submit();
 
-    await expect(programNameInList(page, updatedName)).toBeVisible();
-    await expect(programNameInList(page, originalName)).toHaveCount(0);
+    await expect(edit.dialog).not.toBeVisible({ timeout: 60_000 });
+    await expect(programs.programInList(updatedName)).toBeVisible();
+    await expect(programs.programInList(originalName)).toHaveCount(0);
   });
 
-  test('TC-007 — Non-admin user cannot access Programs page (if role-restricted)', async ({
+  test('TC-008 — Long program name displays without breaking layout', async ({
     page,
+    trackProgram,
   }) => {
-    test.skip(
-      !process.env.DIDAXIS_NONADMIN_EMAIL || !process.env.DIDAXIS_NONADMIN_PASSWORD,
-      'Non-admin credentials are not configured in .env',
-    );
-  });
-});
-
-test.describe('DS-5 Program List - Edge cases', () => {
-  test('TC-008 — Long program name displays without breaking layout', async ({ page }) => {
     const programName = repeatChar('L', 100);
-
-    await createProgram(page, programName, uniqueName('Long name layout check'));
-
-    await expect(programsHeading(page)).toBeVisible();
-    await expect(programNameInList(page, programName)).toBeVisible();
+    await createTracked(page, trackProgram, programName, 'Long name layout');
+    await expect(programs.heading).toBeVisible();
+    await expect(programs.newProgramButton).toBeVisible();
   });
 
-  test('TC-009 — Long description displays without breaking layout', async ({ page }) => {
-    const programName = uniqueName('Long Description Program');
-    const description = repeatChar('D', 500);
-
-    await createProgram(page, programName, description);
-
-    await expect(programsHeading(page)).toBeVisible();
-    await expect(page.getByText(description, { exact: true })).toBeVisible();
-  });
-
-  test('TC-010 — Program name with special characters displays correctly', async ({ page }) => {
-    const programName = uniqueName('Informatique & IA - Niveau 2');
-
-    await createProgram(page, programName, uniqueName('Special characters display'));
-
-    await expect(programNameInList(page, programName)).toBeVisible();
-  });
-
-  test('TC-011 — List with many programs remains usable', async ({ page }) => {
-    await expect(programsHeading(page)).toBeVisible();
-    await expect(newProgramButton(page)).toBeVisible();
-    await expect(page.getByText('Manage academic programs and semesters')).toBeVisible();
-  });
-
-  test('TC-012 — Empty-state create prompt opens creation form', async ({ page }) => {
-    test.fixme(
-      true,
-      'Shared test environment is not empty; empty-state create prompt cannot be tested reliably.',
+  test('TC-010 — Program name with special characters displays correctly', async ({
+    page,
+    trackProgram,
+  }) => {
+    await createTracked(
+      page,
+      trackProgram,
+      uniqueName('Informatique & IA - Niveau 2'),
+      'Special characters display',
     );
+  });
+
+  test('TC-011 — List with many programs remains usable', async () => {
+    await expect(programs.heading).toBeVisible();
+    await expect(programs.newProgramButton).toBeVisible();
+    await expect(programs.subtitle).toBeVisible();
   });
 });

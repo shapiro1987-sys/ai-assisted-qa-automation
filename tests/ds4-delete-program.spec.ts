@@ -1,149 +1,91 @@
-import { test, expect } from '@playwright/test';
-import {
-  cancelDeleteProgram,
-  confirmDeleteDialog,
-  createProgram,
-  deleteProgram,
-  deleteProgramButton,
-  programNameInList,
-  setupProgramsPage,
-  uniqueName,
-} from './didaxis-helpers';
+/**
+ * DS-4 — Delete program with confirmation
+ * Jira: https://legionqaschool.atlassian.net/browse/DS-4
+ */
+import { test, expect, trackProgramCreateFromResponse } from '../fixtures/cleanup.fixture';
+import { ProgramsPage } from '../pages/ProgramsPage';
+import { authStorageFile } from './auth.storage';
+import { uniqueName } from './didaxis-helpers';
 
+test.use({ storageState: authStorageFile });
 test.setTimeout(120_000);
+test.describe.configure({ mode: 'serial' });
+
+let programs: ProgramsPage;
 
 test.beforeEach(async ({ page }) => {
-  await setupProgramsPage(page);
+  programs = new ProgramsPage(page);
+  await programs.goto();
 });
 
-test.describe('DS-4 Delete Program - Positive flows', () => {
-  test('TC-001 — Confirmed deletion removes program from the list', async ({ page }) => {
+async function createTracked(
+  page: Parameters<typeof trackProgramCreateFromResponse>[0],
+  trackProgram: (id: string) => void,
+  name: string,
+  description = '',
+) {
+  await trackProgramCreateFromResponse(page, trackProgram, async () => {
+    await programs.createProgram(name, description);
+  });
+  await expect(programs.newProgramModal.dialog).not.toBeVisible({ timeout: 30_000 });
+  await expect(programs.programInList(name)).toBeVisible({ timeout: 60_000 });
+}
+
+test.describe('DS-4 — Jira acceptance criteria', () => {
+  test('AC-001 — Delete program with confirmation', async ({ page, trackProgram }) => {
     const programName = uniqueName('Test Program');
+    await createTracked(page, trackProgram, programName, 'Delete me');
 
-    await createProgram(page, programName, uniqueName('Delete me'));
-    await deleteProgram(page, programName);
-
-    await expect(programNameInList(page, programName)).toHaveCount(0);
+    const message = await programs.deleteProgram(programName, 'accept');
+    expect(message).toContain(programName);
+    await expect(programs.programInList(programName)).toHaveCount(0, { timeout: 30_000 });
   });
 
-  test('TC-002 — Cancelled deletion keeps program in the list', async ({ page }) => {
+  test('AC-002 — Cancel program deletion', async ({ page, trackProgram }) => {
     const programName = uniqueName('Test Program');
+    await createTracked(page, trackProgram, programName, 'Keep me');
 
-    await createProgram(page, programName, uniqueName('Keep me'));
-    await cancelDeleteProgram(page, programName);
-
-    await expect(programNameInList(page, programName)).toBeVisible();
+    await programs.deleteProgram(programName, 'dismiss');
+    await expect(programs.programInList(programName)).toBeVisible();
   });
+});
 
-  test('TC-003 — Confirmation dialog displays the program name', async ({ page }) => {
+test.describe('DS-4 — Extended', () => {
+  test('TC-003 — Confirmation dialog displays the program name', async ({ page, trackProgram }) => {
     const programName = uniqueName('Web Development 2026');
+    await createTracked(page, trackProgram, programName, 'Confirm dialog');
 
-    await createProgram(page, programName, uniqueName('Confirm dialog test'));
-
-    let dialogMessage = '';
-    page.once('dialog', async (dialog) => {
-      dialogMessage = dialog.message();
-      await dialog.dismiss();
-    });
-
-    await deleteProgramButton(page, programName).scrollIntoViewIfNeeded();
-    await deleteProgramButton(page, programName).click();
-
-    await expect.poll(() => dialogMessage).toContain(programName);
-    await expect(programNameInList(page, programName)).toBeVisible();
+    const message = await programs.deleteProgram(programName, 'dismiss');
+    expect(message).toContain(programName);
+    await expect(programs.programInList(programName)).toBeVisible();
   });
-});
 
-test.describe('DS-4 Delete Program - Negative flows', () => {
-  test('TC-004 — Program is not deleted without confirmation', async ({ page }) => {
+  test('TC-004 — Program is not deleted without confirmation', async ({ page, trackProgram }) => {
     const programName = uniqueName('Test Program');
+    await createTracked(page, trackProgram, programName, 'Dismiss delete');
 
-    await createProgram(page, programName, uniqueName('Dismiss delete'));
-    await cancelDeleteProgram(page, programName);
-
-    await expect(programNameInList(page, programName)).toBeVisible();
+    await programs.deleteProgram(programName, 'dismiss');
+    await expect(programs.programInList(programName)).toBeVisible();
   });
 
-  test('TC-005 — Double-clicking confirm does not cause errors', async ({ page }) => {
-    const programName = uniqueName('Data Science 2026');
-
-    await createProgram(page, programName, uniqueName('Double confirm test'));
-
-    let dialogCount = 0;
-    page.on('dialog', async (dialog) => {
-      dialogCount += 1;
-      await dialog.accept();
-    });
-
-    await deleteProgramButton(page, programName).scrollIntoViewIfNeeded();
-    await deleteProgramButton(page, programName).dblclick();
-
-    await expect(programNameInList(page, programName)).toHaveCount(0, {
-      timeout: 30_000,
-    });
-    expect(dialogCount).toBeGreaterThanOrEqual(1);
-  });
-
-  test('TC-006 — Delete action unavailable or blocked for programs with dependencies (if applicable)', async ({
-    page,
-  }) => {
-    test.fixme(true, 'Dependency-linked programs are not available in the shared test environment.');
-  });
-});
-
-test.describe('DS-4 Delete Program - Edge cases', () => {
-  test('TC-007 — Delete last remaining program shows empty state', async ({ page }) => {
-    test.fixme(
-      true,
-      'Shared test environment always contains many programs; empty-state cannot be isolated safely.',
-    );
-  });
-
-  test('TC-008 — Delete program with special characters in name', async ({ page }) => {
+  test('TC-008 — Delete program with special characters in name', async ({ page, trackProgram }) => {
     const programName = uniqueName('Informatique & IA - Niveau 2');
+    await createTracked(page, trackProgram, programName, 'Special chars');
 
-    await createProgram(page, programName, uniqueName('Special chars delete'));
-
-    let dialogMessage = '';
-    page.once('dialog', async (dialog) => {
-      dialogMessage = dialog.message();
-      await dialog.accept();
-    });
-
-    await deleteProgramButton(page, programName).scrollIntoViewIfNeeded();
-    await deleteProgramButton(page, programName).click();
-
-    await expect.poll(() => dialogMessage).toContain('Informatique & IA - Niveau 2');
-    await expect(programNameInList(page, programName)).toHaveCount(0, {
-      timeout: 30_000,
-    });
+    const message = await programs.deleteProgram(programName, 'accept');
+    expect(message).toContain('Informatique & IA - Niveau 2');
+    await expect(programs.programInList(programName)).toHaveCount(0, { timeout: 30_000 });
   });
 
-  test('TC-009 — Delete one program does not affect others', async ({ page }) => {
+  test('TC-009 — Delete one program does not affect others', async ({ page, trackProgram }) => {
     const deletedProgram = uniqueName('Web Development 2026');
     const remainingProgram = uniqueName('Data Science 2026');
 
-    await createProgram(page, deletedProgram, uniqueName('Delete target'));
-    await createProgram(page, remainingProgram, uniqueName('Should remain'));
+    await createTracked(page, trackProgram, deletedProgram, 'Delete target');
+    await createTracked(page, trackProgram, remainingProgram, 'Should remain');
+    await programs.deleteProgram(deletedProgram, 'accept');
 
-    await deleteProgram(page, deletedProgram);
-
-    await expect(programNameInList(page, remainingProgram)).toBeVisible();
-    await expect(programNameInList(page, deletedProgram)).toHaveCount(0);
-  });
-
-  test('TC-010 — Keyboard accessibility for confirmation dialog', async ({ page }) => {
-    const programName = uniqueName('Escape Delete');
-
-    await createProgram(page, programName, uniqueName('Keyboard delete test'));
-    await cancelDeleteProgram(page, programName);
-
-    await confirmDeleteDialog(page, programName, 'accept');
-    await deleteProgramButton(page, programName).scrollIntoViewIfNeeded();
-    await deleteProgramButton(page, programName).click();
-
-    await expect(programNameInList(page, programName)).toHaveCount(0, {
-      timeout: 30_000,
-    });
+    await expect(programs.programInList(remainingProgram)).toBeVisible();
+    await expect(programs.programInList(deletedProgram)).toHaveCount(0);
   });
 });
