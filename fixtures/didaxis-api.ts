@@ -2,9 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import type { APIRequestContext } from '@playwright/test';
 import { request as playwrightRequest } from '@playwright/test';
+import { authStorageFile } from '../tests/auth.storage';
 import { DIDAXIS_URL } from '../tests/didaxis-helpers';
 
-const defaultAuthStoragePath = path.join(__dirname, '..', 'tests', '.didaxis-auth.json');
+const defaultAuthStoragePath = authStorageFile;
 const programsListTimeoutMs = 300_000;
 
 let cachedBearerToken: string | undefined;
@@ -29,7 +30,7 @@ export function requireApiToken(): string {
   if (fromEnv) return fromEnv;
   if (cachedBearerToken) return cachedBearerToken;
   throw new Error(
-    'DIDAXIS_API_TOKEN must be set in .env, refresh tests/.didaxis-auth.json (didaxis-setup), or run a tracked program create so the Bearer token is captured from the UI session',
+    'DIDAXIS_API_TOKEN must be set in .env, refresh playwright/.auth/user.json (setup project), or run a tracked program create so the Bearer token is captured from the UI session',
   );
 }
 
@@ -56,7 +57,7 @@ export async function resolveAccessToken(
   const refreshToken = readRefreshTokenFromStorage(storagePath);
   if (!refreshToken) {
     throw new Error(
-      `No API token available. Set DIDAXIS_API_TOKEN in .env or run: npx playwright test --project=didaxis-setup`,
+      `No API token available. Set DIDAXIS_API_TOKEN in .env or run: npx playwright test --project=setup`,
     );
   }
 

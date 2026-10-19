@@ -5,6 +5,7 @@
  * Locators verified on https://test.didaxis.studio (Edit Program modal).
  */
 import { test, expect } from '@playwright/test';
+import { authStorageFile } from './auth.storage';
 import {
   cancelEditButton,
   createProgram,
@@ -22,6 +23,8 @@ import {
   showEditAiGenerationConfigButton,
   uniqueName,
 } from './didaxis-helpers';
+
+test.use({ storageState: authStorageFile });
 
 test.setTimeout(120_000);
 

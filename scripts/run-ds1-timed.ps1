@@ -9,8 +9,8 @@ function Add-Step($name, $ms) {
 }
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
-npx playwright test tests/didaxis-auth.setup.ts --project=didaxis-setup | Out-Host
-Add-Step "didaxis-auth.setup" $sw.ElapsedMilliseconds
+npx playwright test tests/auth.setup.ts --project=setup | Out-Host
+Add-Step "auth.setup" $sw.ElapsedMilliseconds
 $sw.Restart()
 
 $testOut = npx playwright test tests/ds1-create-program.spec.ts --project=chromium 2>&1 | Out-String

@@ -140,17 +140,18 @@ export async function login(page: Page) {
   await expect(signOut).toBeVisible({ timeout: 60_000 });
 }
 
+const missingSessionMessage =
+  'Not signed in. Run: npx playwright test --project=setup (DIDAXIS_EMAIL and DIDAXIS_PASSWORD in .env).';
+
+/** Programs page; expects Playwright storageState from tests/auth.setup.ts (no UI login). */
 export async function goToPrograms(page: Page) {
   await page.goto(`${DIDAXIS_URL}/programs`, { waitUntil: 'domcontentloaded' });
-  const newProgram = newProgramButton(page);
-  const onLoginPage = page.getByLabel('Email');
 
-  if (await onLoginPage.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    await login(page);
-    await page.goto(`${DIDAXIS_URL}/programs`, { waitUntil: 'domcontentloaded' });
+  if (await page.getByLabel('Email').isVisible({ timeout: 3_000 }).catch(() => false)) {
+    throw new Error(missingSessionMessage);
   }
 
-  await expect(newProgram).toBeVisible({ timeout: 60_000 });
+  await expect(newProgramButton(page)).toBeVisible({ timeout: 60_000 });
   await expect(programsHeading(page)).toBeVisible({ timeout: 15_000 });
 }
 
@@ -272,6 +273,5 @@ export async function cancelDeleteProgram(page: Page, programName: string) {
 }
 
 export async function setupProgramsPage(page: Page) {
-  await login(page);
   await goToPrograms(page);
 }

@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-const didaxisAuthFile = path.join(__dirname, 'tests', '.didaxis-auth.json');
+import { authStorageFile } from './tests/auth.storage';
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -38,17 +38,17 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
-      name: 'didaxis-setup',
-      testMatch: /didaxis-auth\.setup\.ts/,
+      name: 'setup',
+      testMatch: /\.setup\.ts/,
     },
     {
       name: 'chromium',
-      testIgnore: /didaxis-auth\.setup\.ts/,
+      testIgnore: /\.setup\.ts/,
       use: {
         ...devices['Desktop Chrome'],
-        storageState: didaxisAuthFile,
+        storageState: authStorageFile,
       },
-      dependencies: ['didaxis-setup'],
+      dependencies: ['setup'],
     },
 
     {

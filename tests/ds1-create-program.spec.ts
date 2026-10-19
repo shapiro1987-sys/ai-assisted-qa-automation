@@ -10,6 +10,7 @@ import {
   parseProgramIdFromCreateBody,
 } from '../fixtures/didaxis-api';
 import { test, expect, trackProgramCreateFromResponse } from '../fixtures/cleanup.fixture';
+import { authStorageFile } from './auth.storage';
 import {
   createButton,
   createDescriptionField,
@@ -26,6 +27,8 @@ import {
   programListEntry,
   uniqueName,
 } from './didaxis-helpers';
+
+test.use({ storageState: authStorageFile });
 
 test.setTimeout(120_000);
 
