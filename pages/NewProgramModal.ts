@@ -6,6 +6,8 @@ export class NewProgramModal {
   readonly description: Locator;
   readonly createButton: Locator;
   readonly cancelButton: Locator;
+  /** Role-based CSS for AxeBuilder.include() (Axe only accepts selectors, not locators). */
+  readonly axeIncludeSelector = '[role="dialog"]';
 
   constructor(page: Page) {
     this.dialog = page.getByRole('dialog', { name: 'New Program' });
