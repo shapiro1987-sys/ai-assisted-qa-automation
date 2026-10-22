@@ -1,7 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 
+test.use({
+  baseURL: 'https://demo.playwright.dev/todomvc/',
+  storageState: { cookies: [], origins: [] },
+});
+
 async function openTodoApp(page: Page) {
-  await page.goto('/');
+  await page.goto('https://demo.playwright.dev/todomvc/');
 }
 
 async function addTodo(page: Page, text: string) {

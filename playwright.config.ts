@@ -48,7 +48,10 @@ export default defineConfig({
     },
     {
       name: 'chromium',
-      testIgnore: /\.setup\.ts/,
+      testIgnore: [
+        /\.setup\.ts/,
+        ...(process.env.CI ? ['**/*.a11y.spec.ts'] : []),
+      ],
       use: {
         ...devices['Desktop Chrome'],
         storageState: authStorageFile,

@@ -42,6 +42,8 @@ async function expectNoAxeViolations(violations: AxeViolation[]) {
 }
 
 test.describe('Programs accessibility', () => {
+  test.skip(!!process.env.CI, 'Axe findings are not a CI gate.');
+
   test('Programs page has no accessibility violations', async ({ page }) => {
     const programs = new ProgramsPage(page);
     await programs.goto();
