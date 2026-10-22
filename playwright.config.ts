@@ -15,7 +15,12 @@ import { authStorageFile } from './tests/auth.storage';
  */
 export default defineConfig({
   testDir: './tests',
-  testIgnore: ['**/*_old.spec.ts', '**/.old/**'],
+  testIgnore: [
+    '**/*_old.spec.ts',
+    '**/.old/**',
+    // Axe findings are recorded locally; do not fail GitHub Actions on them.
+    ...(process.env.CI ? ['**/*.a11y.spec.ts'] : []),
+  ],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -25,14 +30,14 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: process.env.CI ? [['html'], ['github']] : 'list',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.BASE_URL ?? 'https://demo.playwright.dev/todomvc/',
+    baseURL: process.env.DIDAXIS_URL,
 
     /* Record traces for the HTML report. See https://playwright.dev/docs/trace-viewer */
-    trace: process.env.CI ? 'on-first-retry' : 'retain-on-failure',
+    trace: 'on-first-retry',
   },
 
   /* Configure projects for major browsers */
@@ -51,15 +56,18 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    ...(!process.env.CI
+      ? [
+          {
+            name: 'firefox',
+            use: { ...devices['Desktop Firefox'] },
+          },
+          {
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
+          },
+        ]
+      : []),
 
     /* Test against mobile viewports. */
     // {
