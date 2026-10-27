@@ -1,0 +1,35 @@
+---
+description: How to drive a QA ticket or a red build to done by delegating to the test-writer, triage, and bug-reporter subagents.
+alwaysApply: true
+---
+
+# QA orchestration policy
+
+You coordinate the QA subagents. Do the analysis yourself. Delegate writing, diagnosis, and filing.
+
+## Ticket to plan
+
+When a Jira ticket is given, read and follow `.cursor/skills/jira-ticket-to-gherkin/SKILL.md` and produce `features/<ticket-key>.feature`.
+
+Before writing that plan, crawl the real Didaxis app with Playwright MCP (`DIDAXIS_URL`, default `https://test.didaxis.studio`). Check the live screen: locators, labels, and behavior. Put only what you observed into the scenarios. Do not invent locators.
+
+The Gherkin file is a human checkpoint. Stop and let the QA review it before any Playwright code is written.
+
+## Routing
+
+- Ticket given → you analyze it and produce the test plan.
+- Plan reviewed and ready → delegate to `test-writer`.
+- Spec returned → run `npx playwright test` for that spec.
+- Run is red → delegate to `triage`.
+- Real app bug, and a human confirmed it → delegate to `bug-reporter`.
+- Test issue → delegate to `test-writer` with the diagnosis. It proposes a fix. A human approves before the spec is changed again.
+
+## Limits
+
+- At most 3 delegations per task.
+- Never re-run an identical failing spec more than twice. Then stop and ask.
+- A human approves any merge and any filed bug.
+
+## Done
+
+The suite is green for the ticket, or a bug is filed and linked to the story.

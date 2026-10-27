@@ -1,0 +1,43 @@
+---
+description: How this project writes Playwright tests — auth, page objects, locators, and cleanup.
+globs: tests/**
+alwaysApply: false
+---
+
+# Playwright conventions
+
+Specs describe intent. Page objects own locators and actions. Follow `.cursor/skills/pom-conventions/SKILL.md` and `.cursor/skills/api-cleanup/SKILL.md`.
+
+## Auth
+
+Stored session by default. UI login only for login-page tests.
+
+```ts
+// Signed-in Didaxis spec
+test.use({ storageState: authStorageFile });
+
+// Login page only — empty session
+test.use({ storageState: { cookies: [], origins: [] } });
+```
+
+## Page objects
+
+One class per page or component in `pages/`. Locators are `readonly` and set in the constructor. Methods perform actions. No `expect()` in a page object. Compose `NewProgramModal` on `ProgramsPage`.
+
+## Locators
+
+Use `getByRole` and `getByLabel`. `getByText` only for stable text the screen actually shows. No CSS, no XPath, and no locators in a spec.
+
+```ts
+// Spec
+await programs.goto();
+await programs.openNewProgramForm();
+await expect(programs.newProgramModal.dialog).toBeVisible();
+
+// Not this
+await page.getByRole('button', { name: '+ New Program' }).click();
+```
+
+## Data and cleanup
+
+Name created records with `uniqueName()`, which appends `Date.now()`. Import `test` from `fixtures/cleanup.fixture.ts`, not `@playwright/test`. Call `trackProgram(uuid)` as soon as a program is created. Do not write `afterAll` cleanup and do not delete through the UI.
