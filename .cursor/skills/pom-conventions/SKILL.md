@@ -6,7 +6,7 @@ description: Enforces Playwright Page Object Model conventions for Didaxis tests
 # Playwright POM conventions
 
 Specs describe behavior. Page Objects own locators and user actions.
-Never put `getByRole` / `getByLabel` / `getByText` / CSS / XPath in a spec.
+Never put a locator in a spec.
 
 ## Layout
 
@@ -25,9 +25,9 @@ Compose the modal on `ProgramsPage` (`readonly newProgramModal`).
 ## Page Object rules
 
 1. Locators are `readonly` properties assigned in the constructor.
-2. Locators use `getByRole` / `getByLabel` / `getByText` only — no CSS, no XPath.
+2. Locators, in order: `getByRole`, then `getByLabel` or `getByPlaceholder`, then `getByText`. `getByTestId` is an escape hatch only, and the reason must be stated. No CSS, no XPath.
 3. Methods perform user actions (`goto`, `openNewProgramForm`, `createProgram`, `fill`, `submit`). No `expect()` in a Page Object.
-4. Parameterized locators are methods that return a `Locator` (e.g. `programInList(name)`).
+4. Parameterized locators are methods that return a `Locator` (e.g. `programInList(name)`). When a locator matches more than one element, disambiguate with `.filter({ hasText })`, not `.first()`.
 5. Scope modal fields to the dialog: `this.dialog.getByLabel('Program Name')`.
 
 ## Spec rules
@@ -35,6 +35,8 @@ Compose the modal on `ProgramsPage` (`readonly newProgramModal`).
 1. Instantiate the page in the test or `beforeEach`. Call `goto()` / actions from the POM.
 2. Every `expect()` stays in the spec and targets POM locators:
    `await expect(programs.heading).toBeVisible()`.
+   Retry with `.toBeVisible()`, `.toBeEnabled()`, or `.toHaveText()`.
+   Do not use `waitForTimeout`. Do not write `expect(await locator.isVisible()).toBe(true)`.
 3. Test body has **zero inline locators**.
 4. Didaxis specs that need a session: `test.use({ storageState: authStorageFile })`.
 5. Login-page specs: `test.use({ storageState: { cookies: [], origins: [] } })`.

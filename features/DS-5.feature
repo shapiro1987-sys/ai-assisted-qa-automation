@@ -7,7 +7,10 @@ Feature: DS-5 Program list filtering and display
   Scenario: AC-001 Display program list with key details
     Given programs exist in the system
     When I navigate to the Programs page
-    Then I see a list showing each program's name and description
+    Then I see the "Programs" heading
+    And I see the text "Manage academic programs and semesters"
+    And I see a table whose first column is "Program"
+    And each row shows that program's name and description
 
   Scenario: AC-002 Empty state when no programs exist
     Given no programs exist
@@ -50,29 +53,46 @@ Feature: DS-5 Program list filtering and display
     When I navigate to the Programs page
     Then access is denied or Programs is not available in the shell
 
+  Scenario: TC-013 Programs page has no search or filter control
+    Given I am logged in as an admin
+    When I navigate to the Programs page
+    Then I see the program table
+    And I do not see a search box, filter, or sort control
+
   # Edge cases
 
   Scenario: TC-008 Long program name displays without breaking layout
     Given a program with a 100-character name exists
     When I view the Programs page
-    Then the table layout remains usable
+    Then the "Programs" heading and "+ New Program" button stay visible
 
   Scenario: TC-009 Long description displays without breaking layout
     Given a program with a 500-character description exists
     When I view the Programs page
-    Then the table layout remains usable
+    Then the "Programs" heading and "+ New Program" button stay visible
 
   Scenario: TC-011 List with many programs remains usable
-    Given thousands of programs exist
+    Given hundreds of programs exist
     When I navigate to the Programs page
-    Then the page loads and the list is scrollable
+    Then the "Programs" heading, the subtitle, and "+ New Program" are visible
 
   Scenario: TC-012 Empty-state create prompt opens creation form
     Given no programs exist
     When I use the empty-state action to create the first program
     Then the New Program form opens
 
+# Crawl 2026-10-29 on https://test.didaxis.studio/programs (signed-in admin)
+# Observed: heading "Programs"; subtitle "Manage academic programs and semesters";
+# button "+ New Program"; button "Sign out"; one table; column headers "Program" and a blank second header;
+# 747 data rows; each row shows name and description together;
+# row buttons named "Edit {program name}" and "Delete {program name}".
+# Not observed: search box, filter, sort, combobox, or any "no programs" empty-state copy.
+# Playwright MCP could not launch (Google Chrome is not installed). Crawl used project Chromium.
+
 # Ambiguities / gaps
-# - Story title mentions "filtering" but Jira AC only covers display and empty state; no search/filter/sort on test.didaxis.studio today.
-# - AC-002 empty state is hard to test on shared test env with thousands of programs; needs isolated account or data reset.
-# - Automation: tests/ds5-program-list.spec.ts
+# - Story title says "filtering" but the acceptance criteria only cover display and empty state.
+#   The live page has no search, filter, or sort. Open bug DS-221 already records that gap.
+# - AC-002 empty-state copy was not on screen. The shared test env has 747 programs, so the message text must not be invented.
+# - The actions column header is blank. Open bug DS-117 already records that.
+# - TC-007 needs a non-admin account. None is configured in this environment.
+# - Automation target: tests/ds5-program-list.spec.ts

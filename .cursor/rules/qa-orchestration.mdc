@@ -33,3 +33,11 @@ The Gherkin file is a human checkpoint. Stop and let the QA review it before any
 ## Done
 
 The suite is green for the ticket, or a bug is filed and linked to the story.
+
+## Guardrails
+
+- A human approves every merge and every filed bug.
+- No subagent edits application source.
+- `test-writer` writes only under `tests/` (and `features/` when the plan still has to be produced); it never edits application source.
+- `triage` is read-only: it returns a diagnosis and does not edit, merge, comment, or file.
+- `bug-reporter` files a confirmed Jira bug and touches no repository files.

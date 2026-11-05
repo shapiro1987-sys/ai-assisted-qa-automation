@@ -17,50 +17,30 @@ Skip: TodoMVC, Playwright.dev example specs, setup-only files, pure API scripts.
 
 ## What to add
 
-1. Prefer `tests/<page>.a11y.spec.ts` (see `tests/programs.a11y.spec.ts`).
-2. Navigate only through POMs. Zero inline locators in the spec.
+1. Prefer `tests/<page>.a11y.spec.ts`. One tag per test.
+2. Navigate only through the existing POMs. Zero inline locators in the spec.
 3. Authenticated screens: `test.use({ storageState: authStorageFile })`.
    Login screen: `test.use({ storageState: { cookies: [], origins: [] } })`.
 4. Scan with `@axe-core/playwright`:
 
 ```ts
-const results = await new AxeBuilder({ page }).analyze();
-await expectNoAxeViolations(results.violations);
+const results = await new AxeBuilder({ page })
+  .withTags(['wcag2a', 'wcag2aa'])
+  .analyze();
+await expect(results.violations).toEqual([]);
 ```
 
-5. For a dialog/component, add **one** scoped scan:
-
-```ts
-await new AxeBuilder({ page }).include(form.axeIncludeSelector).analyze();
-```
-
-Axe `.include()` takes a selector, not a Playwright locator. Put a
-role-based selector on the POM (`axeIncludeSelector = '[role="dialog"]'`).
+5. Call `.include()` or `.exclude()` only when a third-party widget is noisy, and comment why. Do not scope a scan just to shrink it.
+6. Add the keyboard check axe cannot do. On the programs page, tab to `programs.newProgramButton`, assert `toBeFocused()`, press Enter, and assert `programs.newProgramModal.dialog` is visible. Those locators stay on the POM.
 
 ## Violations
 
-If axe finds real violations, DO NOT disable rules to go green — record them
-(they may be a bug for the bug-reporter skill). Only `.disableRules()` with a
-commented reason.
-
-- Keep `expect(violations).toEqual([])` so the spec fails.
-- Attach `axe-violations.json` on the test (ids, impact, help, targets).
-- File a product Bug with `jira-bug-reporter` when the user asks, or note
-  the findings in the reply.
-
-Allowed:
-
-```ts
-.disableRules(['duplicate-id']) // vendor widget injects a duplicate id
-```
-
-Not allowed: stripping `color-contrast` (or any rule) only so CI is green.
-
-Reuse `expectNoAxeViolations` from `tests/programs.a11y.spec.ts` or copy that helper.
+If the scan finds real violations, report them and stop. Never call `.disableRules()` to go green.
 
 ## Checklist
 
-- [ ] `AxeBuilder({ page }).analyze()` on the full page after POM `goto()`
-- [ ] `.include(...)` for a modal/component when one exists
-- [ ] No unexplained `.disableRules()`
-- [ ] Violations attached, not swallowed
+- [ ] `withTags(['wcag2a', 'wcag2aa'])` and `expect(results.violations).toEqual([])`
+- [ ] `.include()` / `.exclude()` only for a noisy third-party widget, with a comment
+- [ ] Keyboard: tab to the primary control, `toBeFocused()`, Enter, dialog open
+- [ ] POM locators only, one tag per test
+- [ ] No `.disableRules()`

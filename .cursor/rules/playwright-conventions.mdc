@@ -1,43 +1,256 @@
 ---
-description: How this project writes Playwright tests — auth, page objects, locators, and cleanup.
+description: how this project writes Playwright tests — auth, POM, locators, data and cleanup
 globs: tests/**
 alwaysApply: false
 ---
 
 # Playwright conventions
 
-Specs describe intent. Page objects own locators and actions. Follow `.cursor/skills/pom-conventions/SKILL.md` and `.cursor/skills/api-cleanup/SKILL.md`.
+## 1. Locators
 
-## Auth
+Role or label first, then placeholder, then text; `getByTestId` only as a stated escape hatch; never CSS or XPath, and never a locator in a spec.
 
-Stored session by default. UI login only for login-page tests.
+✅ Good — `pages/ProgramsPage.ts`
 
 ```ts
-// Signed-in Didaxis spec
-test.use({ storageState: authStorageFile });
-
-// Login page only — empty session
-test.use({ storageState: { cookies: [], origins: [] } });
+this.newProgramButton = page.getByRole('button', { name: '+ New Program' });
+return this.page.getByRole('button', { name: `Edit ${name}`, exact: true });
 ```
 
-## Page objects
-
-One class per page or component in `pages/`. Locators are `readonly` and set in the constructor. Methods perform actions. No `expect()` in a page object. Compose `NewProgramModal` on `ProgramsPage`.
-
-## Locators
-
-Use `getByRole` and `getByLabel`. `getByText` only for stable text the screen actually shows. No CSS, no XPath, and no locators in a spec.
+❌ Bad
 
 ```ts
-// Spec
-await programs.goto();
-await programs.openNewProgramForm();
+await page.locator('.program-row').first().click();
+await page.getByTestId('create'); // no reason given
+```
+
+Why: CSS, XPath, and `.first()` follow markup and DOM order, so a layout change clicks the wrong element.
+
+## 2. Waiting
+
+Wait only with a web-first assertion that retries. Never `waitForTimeout`, and never `expect(await locator.isVisible()).toBe(true)`.
+
+✅ Good — `tests/programs.spec.ts`
+
+```ts
+await expect(programs.heading).toBeVisible();
 await expect(programs.newProgramModal.dialog).toBeVisible();
-
-// Not this
-await page.getByRole('button', { name: '+ New Program' }).click();
 ```
 
-## Data and cleanup
+❌ Bad
 
-Name created records with `uniqueName()`, which appends `Date.now()`. Import `test` from `fixtures/cleanup.fixture.ts`, not `@playwright/test`. Call `trackProgram(uuid)` as soon as a program is created. Do not write `afterAll` cleanup and do not delete through the UI.
+```ts
+await page.waitForTimeout(2000);
+expect(await programs.heading.isVisible()).toBe(true);
+```
+
+Why: a fixed sleep and a one-shot boolean either flake or pass before the UI is ready.
+
+## 3. Page Objects
+
+One class per page or component; locators are `readonly` in the constructor; methods perform actions; a page object has no `expect()`.
+
+✅ Good — `pages/ProgramsPage.ts`
+
+```ts
+constructor(private readonly page: Page) {
+  this.heading = page.getByRole('heading', { name: 'Programs', level: 2 });
+  this.newProgramModal = new NewProgramModal(page);
+}
+async openNewProgramForm() {
+  await this.newProgramButton.click();
+}
+```
+
+❌ Bad
+
+```ts
+async openNewProgramForm() {
+  await this.newProgramButton.click();
+  await expect(this.newProgramModal.dialog).toBeVisible();
+}
+```
+
+Why: an assertion inside a page object hides which behavior failed and couples the object to one test's outcome.
+
+## 4. Auth
+
+Feature tests start from the `setup` project's `storageState`. Login-page tests sign in through the UI. API login is for bulk setup, scripts, and a stale session.
+
+✅ Good — `tests/programs.spec.ts` and `tests/auth.setup.ts`
+
+```ts
+test.use({ storageState: authStorageFile });
+```
+
+❌ Bad
+
+```ts
+test('creates a program', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByRole('button', { name: 'Sign In' }).click();
+});
+```
+
+Why: a UI login in every feature test adds a failure point that is not the behavior under test.
+
+## 5. Test data
+
+Name created records with `uniqueName()` (`Date.now()`). Every test that creates a program calls `trackProgram(uuid)` and lets the fixture delete it.
+
+✅ Good — `tests/didaxis-helpers.ts` and `tests/programs.spec.ts`
+
+```ts
+const programName = uniqueName('Web Development 2026');
+await trackProgramCreateFromResponse(page, trackProgram, async () => {
+  await programs.createProgram(programName, description);
+});
+```
+
+❌ Bad
+
+```ts
+await programs.createProgram('Web Development 2026');
+test.afterAll(async () => { await programs.deleteProgram('Web Development 2026'); });
+```
+
+Why: a shared name collides across parallel runs, and a UI `afterAll` leaves the record behind when the page never reaches delete.
+
+## 6. API testing
+
+Use the Playwright `request` fixture for setup, teardown, and contract checks. Do not mock the endpoint that test is verifying.
+
+✅ Good — advised. Specs do not use `{ request }` yet; cleanup goes through `fixtures/didaxis-api.ts`.
+
+```ts
+test('GET /api/programs returns a data array', async ({ request }) => {
+  const response = await request.get('/api/programs');
+  expect(response.ok()).toBeTruthy();
+  const body = await response.json();
+  expect(Array.isArray(body.data)).toBe(true);
+});
+```
+
+❌ Bad
+
+```ts
+await page.route('**/api/programs', (route) =>
+  route.fulfill({ status: 200, body: '{"data":[]}' }),
+);
+expect((await (await request.get('/api/programs')).json()).data).toEqual([]);
+```
+
+Why: mocking the call you are checking proves the mock, not the API.
+
+## 7. Network mocking
+
+For a UI reaction only, `page.route` fulfills 500, 503, timeout, empty `{ "data": [] }`, or a malformed body. One tag per test. Read the live copy before asserting.
+
+✅ Good — advised. No spec calls `page.route` yet. On the live page, `{ "data": [] }` shows "No programs yet. Create your first program to get started." A bare `[]` or malformed body renders nothing and throws `Cannot read properties of undefined (reading 'length')`. `GET` 500/503 shows that same empty sentence. `POST` 503 leaves the New Program form open and renders no error. `ProgramsPage` has no locator for either, so report the gap.
+
+```ts
+await page.route('**/api/programs', (route) => {
+  if (route.request().method() !== 'GET') return route.continue();
+  return route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ data: [] }),
+  });
+});
+await programs.goto();
+await expect(programs.emptyState).toHaveText(
+  'No programs yet. Create your first program to get started.',
+);
+```
+
+❌ Bad
+
+```ts
+await page.route('**/api/programs', (route) => route.fulfill({ status: 200, body: '[]' }));
+await expect(page.getByText('Something went wrong')).toBeVisible();
+```
+
+Why: a bare array crashes the page, and an invented error string fails a test the UI never implemented.
+
+## 8. Accessibility
+
+On a key page, scan with `wcag2a` and `wcag2aa`, and tab to the primary control. Scope with `.include()` or `.exclude()` only for a noisy third-party widget, with a comment. Real violations are reported and the work stops.
+
+✅ Good — axe shape is the standard; `tests/programs.a11y.spec.ts` scans without these tags and has no keyboard test. Keyboard lines are advised.
+
+```ts
+const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+await expect(results.violations).toEqual([]);
+await programs.newProgramButton.focus();
+await expect(programs.newProgramButton).toBeFocused();
+await programs.newProgramButton.press('Enter');
+await expect(programs.newProgramModal.dialog).toBeVisible();
+```
+
+❌ Bad
+
+```ts
+const results = await new AxeBuilder({ page }).disableRules(['color-contrast']).analyze();
+expect(results.violations).toEqual([]);
+```
+
+Why: `.disableRules()` hides a product defect and the suite goes green without the page being accessible.
+
+## 9. Assertions
+
+Use web-first assertions. Use `expect.soft` when one test checks several independent facts. Use `toHaveScreenshot()` only where a visual diff earns its cost.
+
+✅ Good — web-first checks are in `tests/programs.spec.ts`. `expect.soft` and `toHaveScreenshot()` are advised; neither is in the repo.
+
+```ts
+await expect.soft(programs.heading).toBeVisible();
+await expect.soft(programs.subtitle).toBeVisible();
+await expect(programs.newProgramModal.dialog).toHaveScreenshot('new-program-dialog.png');
+```
+
+❌ Bad
+
+```ts
+expect(await programs.heading.isVisible()).toBe(true);
+await expect(page).toHaveScreenshot();
+```
+
+Why: a one-shot boolean stops at the first miss, and a full-page screenshot fails on every unrelated pixel.
+
+## 10. Anti-flake
+
+CI retries stay at 2 and local retries stay at 0. Do not set `workers: 1`. Tests do not share leftover data. Freeze relative timestamps with `page.clock.install()`. Locale stays `en-CA` and timezone stays `America/Toronto`.
+
+✅ Good — retries, locale, and timezone are in `playwright.config.ts`. The clock example is advised; no spec calls `page.clock`, and `ProgramsPage` has no `createdAgo`.
+
+```ts
+await page.clock.install({ time: new Date('2026-11-05T15:00:00') });
+await programs.goto();
+await expect(programs.createdAgo('Web Development')).toHaveText('2 hours ago');
+```
+
+❌ Bad
+
+```ts
+retries: 5,
+workers: 1,
+await expect(programs.createdAgo('Web Development')).toHaveText('2 hours ago');
+```
+
+Why: extra retries hide a real bug, a single worker hides isolation bugs, and an unfrozen "2 hours ago" changes between a laptop and CI.
+
+## Do / Don't
+
+| Do | Don't |
+|---|---|
+| `getByRole` / `getByLabel`, then placeholder, then text | CSS, XPath, `.first()`, or an unexplained `getByTestId` |
+| `expect(locator).toBeVisible()` / `.toBeEnabled()` / `.toHaveText()` | `waitForTimeout` or `expect(await locator.isVisible()).toBe(true)` |
+| Locators in the constructor; actions on the page object | `expect()` inside a page object, or a locator in a spec |
+| `storageState` from the setup project | A UI login in a feature test |
+| `uniqueName()` and `trackProgram(uuid)` | A fixed name or a UI `afterAll` delete |
+| `{ request }` for contract checks and teardown | Mocking the endpoint that test verifies |
+| `page.route` for 500, 503, timeout, empty, or malformed UI reactions | A bare `[]` or an invented error string |
+| `withTags(['wcag2a','wcag2aa'])` and a Tab/Enter check | `.disableRules()` to go green |
+| `expect.soft` for independent checks; a screenshot where it earns it | A full-page screenshot on every test |
+| CI `retries` of 2, `page.clock.install()`, `en-CA` / `America/Toronto` | `retries` above 2, `workers: 1`, or a live relative timestamp |
