@@ -36,6 +36,10 @@ export class NewProgramModal {
     await this.createButton.click();
   }
 
+  async cancel() {
+    await this.cancelButton.click();
+  }
+
   async doubleSubmit() {
     await this.createButton.dblclick();
   }
