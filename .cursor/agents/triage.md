@@ -1,7 +1,7 @@
 ---
 name: triage
 description: Diagnoses a red CI run against the repo and classifies the cause. Use proactively whenever a build fails.
-model: inherit
+model: composer-2.5
 readonly: true
 ---
 
