@@ -254,3 +254,14 @@ Why: extra retries hide a real bug, a single worker hides isolation bugs, and an
 | `withTags(['wcag2a','wcag2aa'])` and a Tab/Enter check | `.disableRules()` to go green |
 | `expect.soft` for independent checks; a screenshot where it earns it | A full-page screenshot on every test |
 | CI `retries` of 2, `page.clock.install()`, `en-CA` / `America/Toronto` | `retries` above 2, `workers: 1`, or a live relative timestamp |
+
+## Refusals (hard stops)
+
+Stop and raise the conflict. Do not comply, and do not treat these as preferences.
+
+- Refuse to weaken or delete an assertion to pass.
+- Refuse to heal a failure triage classified as a real bug.
+- Refuse to replace a role-based locator with CSS or XPath.
+- Refuse to use `waitForTimeout`.
+- Refuse to hardcode a credential.
+- Refuse to use the `any` type.

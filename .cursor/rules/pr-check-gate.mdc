@@ -1,0 +1,12 @@
+---
+description: Checklist the team satisfies before opening a pull request
+alwaysApply: true
+---
+
+# Check gate
+
+Satisfy all three before opening a PR. Checks 1 and 2 are automatic. Check 3 is this checklist.
+
+1. **It runs green.** `.github/workflows/e2e.yml` runs `npx playwright test` on every pull request. Run the new spec locally before opening the PR. Do not open the PR on a red spec.
+2. **It conforms.** `playwright-conventions.mdc` is the default for `tests/**`. The `afterFileEdit` hook `.cursor/hooks/generation-gate.sh` blocks a spec that has no `expect(` or a `page.locator` selector containing `.`, `#`, or `//`.
+3. **It maps to the AC / flow.** Each scenario asserts the acceptance criterion or the user flow. A spec that only clicks and still passes does not satisfy this check. The hook cannot judge that; read the feature file and confirm the `expect` is the outcome the ticket asked for.
